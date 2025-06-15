@@ -84,8 +84,6 @@ touch ~/.prometheu/mnemonics
 
 
 echo "==== Setup completo ===="
-echo "Lembre-se de ativar o ambiente virtual sempre que for rodar seu código Python:"
-echo "source ~/lightning_env/bin/activate"
 
 echo "Bitcoind e Lightningd já estão rodando no regtest com wallet ativada e saldo para testes!"
 
