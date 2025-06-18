@@ -25,6 +25,7 @@ mkdir -p ~/.bitcoin
 cat <<EOF > ~/.bitcoin/bitcoin.conf
 [regtest]
 server=1
+descriptors=true
 rpcuser=prometheu@prometheu
 rpcpassword=prometheu@prometheu
 rpcbind=127.0.0.1
@@ -37,19 +38,19 @@ echo "==== Iniciando bitcoind ===="
 bitcoind -regtest -daemon
 sleep 10
 
-echo "==== Criando wallet 'regtest_wallet' (se ainda não existir) ===="
-wallets=$(bitcoin-cli -regtest -rpcuser=prometheu@prometheu -rpcpassword=prometheu@prometheu listwallets)
-if [[ $wallets != *"regtest_wallet"* ]]; then
-    bitcoin-cli -regtest -rpcuser=prometheu@prometheu -rpcpassword=prometheu@prometheu createwallet regtest_wallet
-fi
-
-echo "==== Gerando 101 blocos para liberar saldo na wallet ===="
-ADDRESS=$(bitcoin-cli -regtest -rpcuser=prometheu@prometheu -rpcpassword=prometheu@prometheu -rpcwallet=regtest_wallet getnewaddress)
-bitcoin-cli -regtest -rpcuser=prometheu@prometheu -rpcpassword=prometheu@prometheu -rpcwallet=regtest_wallet generatetoaddress 101 $ADDRESS
-
-echo "==== Verificando blockchain e saldo ===="
-bitcoin-cli -regtest -rpcuser=prometheu@prometheu -rpcpassword=prometheu@prometheu -rpcwallet=regtest_wallet getblockchaininfo
-bitcoin-cli -regtest -rpcuser=prometheu@prometheu -rpcpassword=prometheu@prometheu -rpcwallet=regtest_wallet getbalance
+# echo "==== Criando wallet 'regtest_wallet' (se ainda não existir) ===="
+# wallets=$(bitcoin-cli -regtest -rpcuser=prometheu@prometheu -rpcpassword=prometheu@prometheu listwallets)
+# if [[ $wallets != *"regtest_wallet"* ]]; then
+    # bitcoin-cli -regtest -rpcuser=prometheu@prometheu -rpcpassword=prometheu@prometheu createwallet regtest_wallet
+# fi
+#
+# echo "==== Gerando 101 blocos para liberar saldo na wallet ===="
+# ADDRESS=$(bitcoin-cli -regtest -rpcuser=prometheu@prometheu -rpcpassword=prometheu@prometheu -rpcwallet=regtest_wallet getnewaddress)
+# bitcoin-cli -regtest -rpcuser=prometheu@prometheu -rpcpassword=prometheu@prometheu -rpcwallet=regtest_wallet generatetoaddress 101 $ADDRESS
+#
+# echo "==== Verificando blockchain e saldo ===="
+# bitcoin-cli -regtest -rpcuser=prometheu@prometheu -rpcpassword=prometheu@prometheu -rpcwallet=regtest_wallet getblockchaininfo
+# bitcoin-cli -regtest -rpcuser=prometheu@prometheu -rpcpassword=prometheu@prometheu -rpcwallet=regtest_wallet getbalance
 
 echo "==== Clonando e compilando Core Lightning ===="
 cd ~
@@ -68,14 +69,14 @@ source ~/lightning_env/bin/activate
 
 echo "==== Instalando pacotes Python no ambiente virtual ===="
 pip install --upgrade pip
-pip install pyln-client bip-utils requests
+pip install -r requirements.txt
 
 echo "==== Iniciando lightningd apontando para regtest wallet ===="
 # mata processo lightningd anterior, se existir
 pkill lightningd || true
 
-lightningd --network=regtest --log-level=debug --bitcoin-rpcuser=prometheu@prometheu --bitcoin-rpcpassword=prometheu@prometheu --bitcoin-rpcconnect=127.0.0.1 --bitcoin-rpcport=18443 --bitcoin-rpcwallet=regtest_wallet &
-
+lightningd --network=regtest --log-level=debug --bitcoin-rpcuser=prometheu@prometheu --bitcoin-rpcpassword=prometheu@prometheu --bitcoin-rpcconnect=127.0.0.1 --bitcoin-rpcport=18443 &
+# nohup lightningd --network=regtest --log-level=debug --bitcoin-rpcuser=kauan_rpc --bitcoin-rpcpassword=senharpc --bitcoin-rpcconnect=127.0.0.1 --bitcoin-rpcport=18443 > lightningd.log 2>&1 & Rodar em background
 sleep 5
 
 mkdir -p ~/.prometheu
