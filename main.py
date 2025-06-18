@@ -1,4 +1,4 @@
-from bip_utils import Bip39MnemonicGenerator, Bip39SeedGenerator, Bip44, Bip44Coins
+from bip_utils import Bip39MnemonicGenerator, Bip39SeedGenerator, Bip44, Bip44Coins, Bip44Changes
 from pyln.client import LightningRpc
 from bitcoinlib.wallets import HDWallet
 from bitcoinrpc.authproxy import AuthServiceProxy
@@ -21,7 +21,7 @@ def generate_seed(mnemonics):
 def generate_wallet(seed_bytes):
     bip44_mst_ctx = Bip44.FromSeed(seed_bytes, Bip44Coins.BITCOIN)
     bip44_acc_ctx = bip44_mst_ctx.Purpose().Coin().Account(0)
-    bip44_change_ctx = bip44_acc_ctx.Change(0)
+    bip44_change_ctx = bip44_acc_ctx.Change(Bip44Changes.CHAIN_EXT)
     bip44_addr_ctx = bip44_change_ctx.AddressIndex(0)
     return bip44_addr_ctx.PrivateKey().ToWif()
 
