@@ -68,7 +68,7 @@ source ~/lightning_env/bin/activate
 
 echo "==== Instalando pacotes Python no ambiente virtual ===="
 pip install --upgrade pip
-pip install pyln-client bip-utils requests
+pip install -r requirements.txt
 
 echo "==== Iniciando lightningd apontando para regtest wallet ===="
 # mata processo lightningd anterior, se existir
