@@ -61,7 +61,7 @@ if __name__ == "__main__":
     finally:
         # 6. Importa chave privada gerada no Bitcoin Core
         print(f"Saldo da wallet: {rpc_connection.getbalance()}")
-        
+
         rpc_connection.importprivkey(wif_key)
         print("---------------------------")
         print(f"Saldo da wallet: {rpc_connection.getbalance()}")
@@ -111,7 +111,7 @@ if __name__ == "__main__":
         rpc_connection.generatetoaddress(6, rpc_connection.getnewaddress())  # Confirma o canal minerando 6 blocos
 
         # 10. Criar invoice Lightning para 100000 millisatoshis (100 sat)
-        node2_invoice = rpc_node2.invoice(100000, "hello___world", "testpayment")
+        node2_invoice = rpc_node2.invoice(100000, "hello_world", "testpayment")
         print("---------------------------")
         print(f"Invoice node 2 gerado: {node2_invoice}")
 
@@ -127,6 +127,13 @@ if __name__ == "__main__":
         print(f"Invoices: {rpc_node2.listinvoices()}")
         wait = rpc_node1.waitsendpay(node2_invoice['payment_hash'])
         print(f"Pagamento confirmado: {wait}")
+
+        # Verifica status da invoice criada
+        invoice_status = rpc_node2.listinvoices('hello_world')
+        if invoice_status['invoices']:
+            print(f"Status da invoice 'hello_world': {invoice_status['invoices'][0]['status']}")
+        else:
+            print("Invoice 'hello_world' não encontrada.")
 
         print("---------------------------")
         for output in rpc_node1.listfunds()['outputs']:
