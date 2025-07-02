@@ -6,7 +6,7 @@ echo "==== Atualizando sistema ===="
 sudo apt update && sudo apt upgrade -y
 
 echo "==== Instalando dependências de sistema ===="
-sudo apt install -y build-essential autoconf libtool pkg-config libevent-dev libboost-system-dev libboost-filesystem-dev libboost-test-dev libssl-dev libsqlite3-dev python3 python3-pip python3-venv git libgmp-dev zlib1g-dev libsodium-dev
+sudo apt install -y build-essential cmake ninja-build autoconf libtool pkg-config libevent-dev libboost-system-dev libboost-filesystem-dev libboost-test-dev libssl-dev libsqlite3-dev python3 python3-pip python3-venv git libgmp-dev zlib1g-dev libsodium-dev libzmq3-dev libcapnp-dev capnproto systemtap-sdt-dev
 
 echo "==== Clonando e compilando Bitcoin Core (bitcoind) ===="
 cd ~
@@ -14,10 +14,10 @@ if [ ! -d bitcoin ]; then
     git clone https://github.com/bitcoin/bitcoin.git
 fi
 cd bitcoin
-./autogen.sh
-./configure --without-gui
-make -j$(nproc)
-sudo make install
+cmake -B build -DCMAKE_CXX_FLAGS="--param ggc-min-expand=1 --param ggc-min-heapsize=32768"
+cmake --build build
+sudo cp build/src/bitcoind /usr/local/bin/
+sudo cp build/src/bitcoin-cli /usr/local/bin/
 cd ~
 
 echo "==== Criando bitcoin.conf ===="
