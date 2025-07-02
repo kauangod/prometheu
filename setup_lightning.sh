@@ -75,14 +75,15 @@ echo "==== Iniciando lightningd apontando para regtest wallet ===="
 pkill lightningd || true
 
 lightningd --network=regtest --log-level=debug --bitcoin-rpcuser=prometheu@prometheu --bitcoin-rpcpassword=prometheu@prometheu --bitcoin-rpcconnect=127.0.0.1 --bitcoin-rpcport=18443 &
-# nohup lightningd --network=regtest --lightning-dir=/home/kauan/.lightning --log-level=debug --bitcoin-rpcuser=kauan_rpc --bitcoin-rpcpassword=senharpc --bitcoin-rpcconnect=127.0.0.1 --bitcoin-rpcport=18443 --addr=127.0.0.1:9735 > lightningd.log 2>&1 & Rodar em background
+# nohup lightningd --network=regtest --lightning-dir=/home/prometheu/.lightning --log-level=debug --bitcoin-rpcuser=prometheu@prometheu --bitcoin-rpcpassword=prometheu@prometheu --bitcoin-rpcconnect=127.0.0.1 --bitcoin-rpcport=18443 --addr=127.0.0.1:9735 > lightningd.log 2>&1 & Rodar em background
 mkdir -p ~/.lightning2
-# nohup lightningd --network=regtest --lightning-dir=/home/kauan/.lightning2 --log-level=debug --bitcoin-rpcuser=kauan_rpc --bitcoin-rpcpassword=senharpc --bitcoin-rpcconnect=127.0.0.1 --bitcoin-rpcport=18443 --addr=127.0.0.1:9737 --grpc-port=10010 > lightningd2.log 2>&1 &
+# nohup lightningd --network=regtest --lightning-dir=/home/kauan/.lightning2 --log-level=debug --bitcoin-rpcuser=prometheu@prometheu --bitcoin-rpcpassword=prometheu@prometheu --bitcoin-rpcconnect=127.0.0.1 --bitcoin-rpcport=18443 --addr=127.0.0.1:9737 --grpc-port=10010 > lightningd2.log 2>&1 &
 sleep 5
 
 mkdir -p ~/.prometheu
 touch ~/.prometheu/pin
 touch ~/.prometheu/mnemonics
+touch ~/.prometheu/lightning_address
 
 
 echo "==== Setup completo ===="

@@ -2,6 +2,8 @@ from bip_utils import Bip39MnemonicGenerator, Bip39SeedGenerator, Bip44, Bip44Co
 from pyln.client import LightningRpc
 from bitcoinrpc.authproxy import AuthServiceProxy
 from bip_utils import Bip44Changes
+import uuid
+import time
 
 def generate_mnemonics():
     return Bip39MnemonicGenerator().FromWordsNumber(24)
@@ -16,9 +18,9 @@ def generate_wallet(seed_bytes):
     bip44_addr_ctx = bip44_change_ctx.AddressIndex(0)
     return bip44_addr_ctx.PrivateKey().Raw().ToBytes()
 
-#def create_invoice(msat):
-#    inv = rpc.invoice(msat, "testlabel", "Invoice description")
-#    return inv
+# Soma o saldo total dos outputs de um node
+def saldo_total(node_funds):
+    return sum([out['amount_msat'] for out in node_funds['outputs']]) / 1000  # em satoshis
 
 if __name__ == "__main__":
     print("---------------------------")
@@ -53,29 +55,23 @@ if __name__ == "__main__":
     except Exception as e:
         print(f"Wallet já existe ou erro ao criar: {e}")
 
-    # Checa se a wallet existe ou já está carregada
+    # 6. Checa se a wallet existe ou já está carregada e importa chave privada
     try:
         rpc_connection.loadwallet("regtest_wallet")
     except Exception as e:
         print(f"Erro ao carregar wallet: {e}")
     finally:
-        # 6. Importa chave privada gerada no Bitcoin Core
-        print(f"Saldo da wallet: {rpc_connection.getbalance()}")
-
+        print(f"Saldo da wallet on-chain: {rpc_connection.getbalance()}")
         rpc_connection.importprivkey(wif_key)
         print("---------------------------")
-        print(f"Saldo da wallet: {rpc_connection.getbalance()}")
+        print(f"Saldo da wallet on-chain após importação da chave privada: {rpc_connection.getbalance()}")
 
         # 7. Pega endereço Lightning on-chain
-        lightning_address = rpc_node1.newaddr()['bech32']
+        lightning_address = rpc_node1.newaddr()['bech32'] # salvar esse endereço em um arquivo e depois só gerar o endereço caso o arquivo esteja vazio
         print("---------------------------")
         print(f"Endereço on-chain da Lightning wallet: {lightning_address}")
-
-        print("---------------------------")
-        for output in rpc_node1.listfunds()['outputs']:
-            print(f"Output: {output}")
-        for channel in rpc_node1.listchannels()['channels']:
-            print(f"Channel: {channel}")
+        node1_funds_temp = rpc_node1.listfunds()
+        print(f"Saldo total Node 1: {saldo_total(node1_funds_temp)} satoshis")
 
         # 8. Envia 1 BTC da wallet para a carteira Lightning
         txid = rpc_connection.sendtoaddress(lightning_address, 1)
@@ -89,13 +85,11 @@ if __name__ == "__main__":
         print("---------------------------")
         print("Blocos minerados.")
 
-        # 10. Verifica saldo
+        # 10. Verifica saldo após mineração
         print("---------------------------")
-        print(f"Saldo da wallet: {rpc_connection.getbalance()}")
-        for output in rpc_node1.listfunds()['outputs']:
-            print(f"Output: {output}")
-        for channel in rpc_node1.listchannels()['channels']:
-            print(f"Channel: {channel}")
+        print(f"Saldo da wallet on-chain: {rpc_connection.getbalance()}")
+        node1_funds_temp = rpc_node1.listfunds()
+        print(f"Saldo total Node 1: {saldo_total(node1_funds_temp)} satoshis")
 
         print("---------------------------")
         print(f"Informações do node 1: {rpc_node1.getinfo()}")
@@ -104,49 +98,66 @@ if __name__ == "__main__":
         # 11. Conecta-se ao Node 2 e abre canal de pagamento
         node2_info = rpc_node2.getinfo()
         rpc_node1.connect(node2_info['id'], "127.0.0.1", 9737)
-        funding_address = rpc_node1.fundchannel(node2_info['id'], 100000)  # 100.000 msat = 0.001 BTC
+        funding_address = rpc_node1.fundchannel(node2_info['id'], '50000sat')  # 100.000 msat = 0.001 BTC
         print("---------------------------")
         print(f"Canal aberto: {funding_address}")
 
-        rpc_connection.generatetoaddress(6, rpc_connection.getnewaddress())  # Confirma o canal minerando 6 blocos
+        # 12. Confirma o canal minerando 6 blocos
+        rpc_connection.generatetoaddress(6, rpc_connection.getnewaddress())
 
-        # 10. Criar invoice Lightning para 100000 millisatoshis (100 sat)
-        node2_invoice = rpc_node2.invoice(100000, "hello_world", "testpayment")
+        # 13. Criar invoice Lightning para 100000 millisatoshis (100 sat)
+        random_label = str(uuid.uuid4())
+        node2_invoice = rpc_node2.invoice(100000, random_label, "testpayment")
         print("---------------------------")
         print(f"Invoice node 2 gerado: {node2_invoice}")
 
-        # 12. Gera rota de pagamento
-        rota = rpc_node1.getroute(node2_info['id'], 100000, 1)
+        # 14. Realiza pagamento via pay (mais estável que sendpay)
+        pay_result = rpc_node1.pay(node2_invoice['bolt11'])
         print("---------------------------")
-        print(f"Rota gerada: {rota}")
-
-        rpc_node1.sendpay(rota['route'], node2_invoice['payment_hash'])
-        print("---------------------------")
-        print(f"Pagamento enviado: {rpc_node1.getroute(node2_info['id'], 100000, 1)}")
+        print(f"Pagamento enviado: {pay_result}")
         print(f"Payment hash: {node2_invoice['payment_hash']}")
         print(f"Invoices: {rpc_node2.listinvoices()}")
-        wait = rpc_node1.waitsendpay(node2_invoice['payment_hash'])
-        print(f"Pagamento confirmado: {wait}")
 
-        # Verifica status da invoice criada
-        invoice_status = rpc_node2.listinvoices('hello_world')
+        # 15. Verifica status da invoice criada
+        invoice_status = rpc_node2.listinvoices(random_label)
         if invoice_status['invoices']:
-            print(f"Status da invoice 'hello_world': {invoice_status['invoices'][0]['status']}")
+            print(f"Status da invoice {random_label}: {invoice_status['invoices'][0]['status']}")
         else:
-            print("Invoice 'hello_world' não encontrada.")
+            print(f"Invoice {random_label} não encontrada.")
 
+        # 16. Obter endereço do node2 (receptor)
+        node2_address = rpc_node2.newaddr()['bech32']
         print("---------------------------")
-        for output in rpc_node1.listfunds()['outputs']:
-            print(f"Output Node 1: {output}")
-        for channel in rpc_node1.listchannels()['channels']:
-            print(f"Channel Node 1: {channel}")
+        print(f"Endereço do node 2 (receptor): {node2_address}")
 
-        print("---------------------------")
-        for output in rpc_node2.listfunds()['outputs']:
-            print(f"Output Node 2: {output}")
-        for channel in rpc_node2.listchannels()['channels']:
-            print(f"Channel Node 2: {channel}")
+        # 17. Obter id do canal utilizado para o pagamento (último canal)
+        node1_funds = rpc_node1.listfunds()
+        channel_id = None
+        if node1_funds['channels']:
+            ch = node1_funds['channels'][-1]
+            channel_id = ch['channel_id'] if 'channel_id' in ch else ch.get('short_channel_id')
+            print(f"Canal utilizado: {ch}")
+        if not channel_id:
+            print("Canal não encontrado para fechamento!")
+        else:
+            # 18. Espera até o canal estar pronto para ser fechado (short_channel_id disponível e estado CHANNELD_NORMAL)
+            max_wait = 60  # segundos
+            waited = 0
+            while ('short_channel_id' not in ch or ch['state'] != 'CHANNELD_NORMAL') and waited < max_wait:
+                print(f"Aguardando canal lockin... Estado atual: {ch['state']}")
+                time.sleep(2)
+                waited += 2
+                node1_funds = rpc_node1.listfunds()
+                if node1_funds['channels']:
+                    ch = node1_funds['channels'][-1]
+            if 'short_channel_id' not in ch or ch['state'] != 'CHANNELD_NORMAL':
+                raise Exception('Canal não ficou pronto para fechamento (lockin) após tempo limite!')
+            short_channel_id = ch['short_channel_id']
+            close_result = rpc_node1.close(short_channel_id, 0, destination=node2_address)
+            print(f"Resultado do fechamento do canal (com short_channel_id): {close_result}")
 
-        print("---------------------------")
-        print(f"Informações do node 1: {rpc_node1.getinfo()}")
-        print(f"Informações do node 2: {rpc_node2.getinfo()}")
+        # 19. Printar saldo total dos nodes
+        node1_total = saldo_total(rpc_node1.listfunds())
+        node2_total = saldo_total(rpc_node2.listfunds())
+        print(f"Saldo total Node 1: {node1_total} satoshis")
+        print(f"Saldo total Node 2: {node2_total} satoshis")
