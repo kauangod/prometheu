@@ -45,7 +45,7 @@ if __name__ == "__main__":
     # 4. Conexão RPC Bitcoin Core e Lightning
     rpc_user = "prometheu@prometheu"
     rpc_password = "prometheu"
-    rpc_connection = AuthServiceProxy(f"http://{rpc_user}:{rpc_password}@127.0.0.1:18443")
+    rpc_connection = AuthServiceProxy(f"http://{rpc_user}:{rpc_password}@127.0.0.1:8332")
     rpc_node = LightningRpc("/home/kauan/.lightning/regtest/lightning-rpc")
 
     # 5. Cria wallet no Bitcoin Core (se não existir)
