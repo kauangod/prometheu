@@ -46,11 +46,51 @@ if [ ! -d lightning ]; then
 fi
 cd lightning
 ./configure
-make -j$(nproc) # -j3 para não sobrecarregar a Raspberry Pi.
+make -j$(nproc) # -j3 se tiver na Raspberry Pi.
 sudo make install
 
-echo "==== Criando ambiente virtual Python ===="
-cd ~
+echo "==== Criando configuração do lightningd para dois nodes ===="
+if [ ! -d ~/.lightning ]; then
+    mkdir -p ~/.lightning
+fi
+if [ ! -d ~/.lightning2 ]; then
+    mkdir -p ~/.lightning2
+fi
+if [ ! -f ~/.lightning/config ]; then
+cd ~/.lightning
+cat <<EOF > config
+network=regtest
+log-level=debug
+bitcoin-rpcuser=prometheu@prometheu
+bitcoin-rpcpassword=prometheu
+bitcoin-rpcport=8332
+bitcoin-rpcconnect=127.0.0.1
+EOF
+fi
+if [ ! -f ~/.lightning2/config ]; then
+cd ~/.lightning2
+cat <<EOF > config
+network=regtest
+log-level=debug
+bitcoin-rpcuser=prometheu@prometheu
+bitcoin-rpcpassword=prometheu
+bitcoin-rpcport=8332
+bitcoin-rpcconnect=127.0.0.1
+addr=127.0.0.1:9737
+grpc-port=10010
+EOF
+fi
+
+echo "==== Criando diretórios para o ambiente virtual Python ===="
+if [ ! -d ~/.prometheu ]; then
+mkdir -p ~/.prometheu
+git clone https://github.com/kauangod/prometheu.git
+git checkout pc
+touch ~/.prometheu/pin
+touch ~/.prometheu/mnemonics
+touch ~/.prometheu/lightning_address
+fi
+cd ~/.prometheu/prometheu
 python3 -m venv lightning_env
 source ~/lightning_env/bin/activate
 
@@ -62,17 +102,12 @@ echo "==== Iniciando lightningd apontando para regtest wallet ===="
 # mata processo lightningd anterior, se existir
 pkill lightningd || true
 
-lightningd --network=regtest --log-level=debug --bitcoin-rpcuser=prometheu@prometheu --bitcoin-rpcpassword=prometheu@prometheu --bitcoin-rpcconnect=127.0.0.1 --bitcoin-rpcport=18443 &
-# nohup lightningd --network=regtest --lightning-dir=/home/prometheu/.lightning --log-level=debug --bitcoin-rpcuser=prometheu@prometheu --bitcoin-rpcpassword=prometheu@prometheu --bitcoin-rpcconnect=127.0.0.1 --bitcoin-rpcport=18443 --addr=127.0.0.1:9735 > lightningd.log 2>&1 & Rodar em background
-mkdir -p ~/.lightning2
-# nohup lightningd --network=regtest --lightning-dir=/home/kauan/.lightning2 --log-level=debug --bitcoin-rpcuser=prometheu@prometheu --bitcoin-rpcpassword=prometheu@prometheu --bitcoin-rpcconnect=127.0.0.1 --bitcoin-rpcport=18443 --addr=127.0.0.1:9737 --grpc-port=10010 > lightningd2.log 2>&1 &
+lightningd --network=regtest --lightning-dir=/home/kauan/.lightning > lightningd.log 2>&1 & # Se quiser rodar mesmo fechando o terminal, adicione nohup no início do comando.
+lightningd --network=regtest --lightning-dir=/home/kauan/.lightning2 > lightningd2.log 2>&1 & # Se quiser rodar mesmo fechando o terminal, adicione nohup no início do comando.
+# Templates anteriores:
+    # nohup lightningd --network=regtest --lightning-dir=/home/prometheu/.lightning --log-level=debug --bitcoin-rpcuser=prometheu@prometheu --bitcoin-rpcpassword=prometheu@prometheu --bitcoin-rpcconnect=127.0.0.1 --bitcoin-rpcport=18443 --addr=127.0.0.1:9735 > lightningd.log 2>&1 & Rodar em background
+    # nohup lightningd --network=regtest --lightning-dir=/home/kauan/.lightning2 --log-level=debug --bitcoin-rpcuser=prometheu@prometheu --bitcoin-rpcpassword=prometheu@prometheu --bitcoin-rpcconnect=127.0.0.1 --bitcoin-rpcport=18443 --addr=127.0.0.1:9737 --grpc-port=10010 > lightningd2.log 2>&1 &
 sleep 5
-
-mkdir -p ~/.prometheu
-touch ~/.prometheu/pin.txt
-touch ~/.prometheu/mnemonics.txt
-touch ~/.prometheu/lightning_address.txt
-
 
 echo "==== Setup completo ===="
 echo "Lembre-se de ativar o ambiente virtual sempre que for rodar seu código Python:"
