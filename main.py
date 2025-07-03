@@ -20,7 +20,7 @@ def generate_wallet(seed_bytes):
 
 # Soma o saldo total dos outputs de um node
 def saldo_total(node_funds):
-    return sum([out['amount_msat'] for out in node_funds['outputs']]) / 1000  # em satoshis
+    return sum([out["amount_msat"] for out in node_funds["outputs"]]) / 1000  # em satoshis
 
 if __name__ == "__main__":
     print("---------------------------")
@@ -43,8 +43,8 @@ if __name__ == "__main__":
     print("WIF gerado:", wif_key)
 
     # 4. Conexão RPC Bitcoin Core e Lightning
-    rpc_user = 'prometheu@prometheu'
-    rpc_password = 'prometheu'
+    rpc_user = "prometheu@prometheu"
+    rpc_password = "prometheu"
     rpc_connection = AuthServiceProxy(f"http://{rpc_user}:{rpc_password}@127.0.0.1:18443")
     rpc_node = LightningRpc("/home/kauan/.lightning/regtest/lightning-rpc")
 
@@ -66,7 +66,7 @@ if __name__ == "__main__":
         print(f"Saldo da wallet on-chain após importação da chave privada: {rpc_connection.getbalance()}")
 
         # 7. Pega endereço Lightning on-chain
-        lightning_address = rpc_node.newaddr()['bech32'] # salvar esse endereço em um arquivo e depois só gerar o endereço caso o arquivo esteja vazio
+        lightning_address = rpc_node.newaddr()["bech32"]
         print("---------------------------")
         print(f"Endereço on-chain da Lightning wallet: {lightning_address}")
         node_funds_temp = rpc_node.listfunds()
@@ -98,21 +98,28 @@ if __name__ == "__main__":
         print(f"Invoice node 2 gerado: {node2_invoice}")
 
         # Empacota para o qrcode isso aqui:
-        infos_node = {"invoice": node2_invoice, "node": {"lightning_address": lightning_address, "node_id": rpc_node.getinfo()['id']}}
+        infos_node = {"invoice": node2_invoice, "node": {"lightning_address": lightning_address, "node_id": rpc_node.getinfo()["id"]}}
 
         # 15. Verifica status da invoice criada
         invoice_status = rpc_node.listinvoices(random_label)
-        if invoice_status['invoices']:
-            print(f"Status da invoice {random_label}: {invoice_status['invoices'][0]['status']}")
+        if invoice_status["invoices"]:
+            print(f"Status da invoice {random_label}: {invoice_status['invoices'][-1]['status']}")
+            while invoice_status["invoices"][-1]["status"] != "paid":
+                print(f"Aguardando pagamento da invoice {random_label}...")
+                time.sleep(2)
+                invoice_status = rpc_node.listinvoices(random_label)
+            print(f"Invoice {random_label} paga.")
         else:
             print(f"Invoice {random_label} não encontrada.")
+
+
 
         # 17. Obter id do canal utilizado para o pagamento (último canal)
         node_funds = rpc_node.listfunds()
         channel_id = None
-        if node_funds['channels']:
-            ch = node_funds['channels'][-1]
-            channel_id = ch['channel_id'] if 'channel_id' in ch else ch.get('short_channel_id')
+        if node_funds["channels"]:
+            ch = node_funds["channels"][-1]
+            channel_id = ch["channel_id"] if "channel_id" in ch else ch.get("short_channel_id")
             print(f"Canal utilizado: {ch}")
         if not channel_id:
             print("Canal não encontrado para fechamento!")
@@ -120,17 +127,17 @@ if __name__ == "__main__":
             # 18. Espera até o canal estar pronto para ser fechado (short_channel_id disponível e estado CHANNELD_NORMAL)
             max_wait = 60  # segundos
             waited = 0
-            while (ch['state'] != 'CLOSINGD_COMPLETE') and waited < max_wait:
+            while (ch["state"] != "CLOSINGD_COMPLETE") and waited < max_wait:
                 print(f"Aguardando fechamento do canal... Estado atual: {ch['state']}")
                 time.sleep(2)
                 waited += 2
                 node_funds = rpc_node.listfunds()
-                if node_funds['channels']:
-                    ch = node_funds['channels'][-1]
+                if node_funds["channels"]:
+                    ch = node_funds["channels"][-1]
 
-        if ch['state'] != 'CLOSINGD_COMPLETE':
+        if ch["state"] != "CLOSINGD_COMPLETE":
             print(f"Canal não fechado: {ch}")
-            # raise Exception('Canal não fechado!') 
+            # raise Exception("Canal não fechado!")
         else:
             print(f"Canal fechado com sucesso: {ch}")
 

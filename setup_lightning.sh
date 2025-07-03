@@ -73,9 +73,9 @@ cd ~/.lightning
 cat <<EOF > config
 network=regtest
 log-level=debug
-bitcoin-rpcuser=kauan_rpc
-bitcoin-rpcpassword=senharpc
-bitcoin-rpcport=18443
+bitcoin-rpcuser=prometheu@prometheu
+bitcoin-rpcpassword=prometheu
+bitcoin-rpcport=8332
 bitcoin-rpcconnect=127.0.0.1
 EOF
 fi
@@ -84,9 +84,9 @@ cd ~/.lightning2
 cat <<EOF > config
 network=regtest
 log-level=debug
-bitcoin-rpcuser=kauan_rpc
-bitcoin-rpcpassword=senharpc
-bitcoin-rpcport=18443
+bitcoin-rpcuser=prometheu@prometheu
+bitcoin-rpcpassword=prometheu
+bitcoin-rpcport=8332
 bitcoin-rpcconnect=127.0.0.1
 addr=127.0.0.1:9737
 grpc-port=10010
