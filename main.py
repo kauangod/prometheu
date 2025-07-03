@@ -26,7 +26,6 @@ if __name__ == "__main__":
     NODE1_RPC_PATH = "/home/prometheu/.lightning/regtest/lightning-rpc" # Verificar se está nesse caminho mesmo.
 
     # Dados do node remoto (Node 2)
-    NODE2_ID = "<node2_id>"           # Ex: 02abc123...
     NODE2_IP = '192.168.15.6'          # Verificar sempre que trocar de rede
     NODE2_PORT = 9735                  # Porta padrão
 
@@ -112,22 +111,23 @@ if __name__ == "__main__":
         print("---------------------------")
         print(f"Informações do node 1: {rpc_node1.getinfo()}")
 
-        # 10. Conecta-se ao Node 2 e abre canal de pagamento
+        # 10. Criar invoice Lightning para 100000 millisatoshis (100 sat)
+        infos_node2 = "" # Desempacotar o valor do qrcode gerado no node 2, saída esperada: {"invoice": {"bolt11": "...", "destination": "..."}, "node": {"lightning_address": "bcrt1...", "node_id": "..."}}
+        bolt11_invoice = infos_node2["invoice"]["bolt11"]
+        node2_address = infos_node2["node"]["lightning_address"]
+        node2_id = infos_node2["node"]["node_id"]
+        print("---------------------------")
+        print(f"Invoice node 2 (BOLT11) recebida: {bolt11_invoice}")
+
+        # 11. Conecta-se ao Node 2 e abre canal de pagamento
         # Use as variáveis de configuração para conectar
-        rpc_node1.connect(NODE2_ID, NODE2_IP, NODE2_PORT)
-        funding_address = rpc_node1.fundchannel(NODE2_ID, '100000sat')  # 100.000 msat = 0.001 BTC
+        rpc_node1.connect(node2_id, NODE2_IP, NODE2_PORT)
+        funding_address = rpc_node1.fundchannel(node2_id, '100000sat')  # 100.000 msat = 0.001 BTC
         print("---------------------------")
         print(f"Canal aberto: {funding_address}")
 
         # 11. Confirma o canal minerando 6 blocos
         rpc_connection.generatetoaddress(6, rpc_connection.getnewaddress())
-
-        # 12. Criar invoice Lightning para 100000 millisatoshis (100 sat)
-        infos_node2 = "" # Desempacotar o valor do qrcode gerado no node 2, saída esperada: {"invoice": {"bolt11": "...", "destination": "..."}, "address": "bcrt1..."}
-        bolt11_invoice = infos_node2["invoice"]["bolt11"]
-        node2_address = infos_node2["address"]
-        print("---------------------------")
-        print(f"Invoice node 2 (BOLT11) recebida: {bolt11_invoice}")
 
         # 13. Realiza pagamento via pay
         pay_result = rpc_node1.pay(bolt11_invoice)
