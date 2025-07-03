@@ -123,9 +123,9 @@ if __name__ == "__main__":
         rpc_connection.generatetoaddress(6, rpc_connection.getnewaddress())
 
         # 12. Criar invoice Lightning para 100000 millisatoshis (100 sat)
-        bolt11_invoice_node2_address = "<bolt11_invoice_gerada_no_node2_junto_com_endereço_do_node2>" # Colocar também o endereço do node 2 para fechamento do canal
-        bolt11_invoice = "desempacotar o valor do bolt11 da variável anterior"
-        node2_address = "desempacotar o valor do endereço do node 2 da variável anterior"
+        infos_node2 = "" # Desempacotar o valor do qrcode gerado no node 2, saída esperada: {"invoice": {"bolt11": "...", "destination": "..."}, "address": "bcrt1..."}
+        bolt11_invoice = infos_node2["invoice"]["bolt11"]
+        node2_address = infos_node2["address"]
         print("---------------------------")
         print(f"Invoice node 2 (BOLT11) recebida: {bolt11_invoice}")
 
