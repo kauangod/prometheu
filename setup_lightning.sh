@@ -24,11 +24,14 @@ echo "==== Criando bitcoin.conf ===="
 mkdir -p ~/.bitcoin
 cat <<EOF > ~/.bitcoin/bitcoin.conf
 [regtest]
-server=1
 rpcuser=prometheu@prometheu
-rpcpassword=prometheu@prometheu
-rpcbind=127.0.0.1
+rpcpassword=prometheu
+deprecatedrpc=create_bdb
+rpcport=8332
 rpcallowip=127.0.0.1
+rpcallowip=192.168.15.0/24       # permite acesso da rede local (ajuste se necessário)
+rpcbind=0.0.0.0            	     # IP local do PC onde o bitcoind está rodando
+server=1
 txindex=1
 fallbackfee=0.0002
 EOF
