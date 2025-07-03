@@ -6,29 +6,21 @@ echo "==== Atualizando sistema ===="
 sudo apt update && sudo apt upgrade -y
 
 echo "==== Instalando dependências de sistema ===="
-sudo apt install -y build-essential cmake ninja-build autoconf libtool pkg-config libevent-dev libboost-system-dev libboost-filesystem-dev libboost-test-dev libssl-dev libsqlite3-dev python3 python3-pip python3-venv git libgmp-dev zlib1g-dev libsodium-dev libzmq3-dev libcapnp-dev capnproto systemtap-sdt-dev
+sudo apt install -y build-essential cmake ninja-build autoconf libtool pkg-config libevent-dev libboost-system-dev libboost-filesystem-dev libboost-test-dev libssl-dev libsqlite3-dev python3 python3-pip python3-venv git libgmp-dev zlib1g-dev libsodium-dev libzmq3-dev libcapnp-dev capnproto systemtap-sdt-dev python3-mako gettext libboost-all-dev
 
-echo "==== Clonando e compilando Bitcoin Core (bitcoind) ===="
-cd ~
-if [ ! -d bitcoin ]; then
-    git clone https://github.com/bitcoin/bitcoin.git
-fi
-cd bitcoin
-cmake -B build -DCMAKE_CXX_FLAGS="--param ggc-min-expand=1 --param ggc-min-heapsize=32768"
-cmake --build build
-sudo cp build/src/bitcoind /usr/local/bin/
-sudo cp build/src/bitcoin-cli /usr/local/bin/
-cd ~
 
 echo "==== Criando bitcoin.conf ===="
 mkdir -p ~/.bitcoin
 cat <<EOF > ~/.bitcoin/bitcoin.conf
 [regtest]
-server=1
 rpcuser=prometheu@prometheu
-rpcpassword=prometheu@prometheu
-rpcbind=127.0.0.1
+rpcpassword=prometheu
+deprecatedrpc=create_bdb
+rpcport=8332
 rpcallowip=127.0.0.1
+rpcallowip=192.168.15.0/24       # permite acesso da rede local (ajuste se necessário)
+rpcbind=0.0.0.0            # IP local do PC onde o bitcoind está rodando
+server=1
 txindex=1
 fallbackfee=0.0002
 EOF
@@ -46,10 +38,6 @@ sleep 10
 # echo "==== Gerando 101 blocos para liberar saldo na wallet ===="
 # ADDRESS=$(bitcoin-cli -regtest -rpcuser=prometheu@prometheu -rpcpassword=prometheu@prometheu -rpcwallet=regtest_wallet getnewaddress)
 # bitcoin-cli -regtest -rpcuser=prometheu@prometheu -rpcpassword=prometheu@prometheu -rpcwallet=regtest_wallet generatetoaddress 101 $ADDRESS
-#
-# echo "==== Verificando blockchain e saldo ===="
-# bitcoin-cli -regtest -rpcuser=prometheu@prometheu -rpcpassword=prometheu@prometheu -rpcwallet=regtest_wallet getblockchaininfo
-# bitcoin-cli -regtest -rpcuser=prometheu@prometheu -rpcpassword=prometheu@prometheu -rpcwallet=regtest_wallet getbalance
 
 echo "==== Clonando e compilando Core Lightning ===="
 cd ~
@@ -58,7 +46,7 @@ if [ ! -d lightning ]; then
 fi
 cd lightning
 ./configure
-make -j$(nproc)
+make -j$(nproc) # -j3 para não sobrecarregar a Raspberry Pi.
 sudo make install
 
 echo "==== Criando ambiente virtual Python ===="
@@ -81,9 +69,9 @@ mkdir -p ~/.lightning2
 sleep 5
 
 mkdir -p ~/.prometheu
-touch ~/.prometheu/pin
-touch ~/.prometheu/mnemonics
-touch ~/.prometheu/lightning_address
+touch ~/.prometheu/pin.txt
+touch ~/.prometheu/mnemonics.txt
+touch ~/.prometheu/lightning_address.txt
 
 
 echo "==== Setup completo ===="
