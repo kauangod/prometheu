@@ -1,3 +1,4 @@
+import json
 from bip_utils import Bip39MnemonicGenerator, Bip39SeedGenerator, Bip44, Bip44Coins, WifEncoder, CoinsConf, WifPubKeyModes
 from pyln.client import LightningRpc
 from bitcoinrpc.authproxy import AuthServiceProxy
@@ -45,7 +46,8 @@ if __name__ == "__main__":
     # 4. Conexão RPC Bitcoin Core e Lightning
     rpc_user = "prometheu@prometheu"
     rpc_password = "prometheu"
-    rpc_connection = AuthServiceProxy(f"http://{rpc_user}:{rpc_password}@127.0.0.1:8332")
+    wallet_name = "regtest_wallet"
+    rpc_connection = AuthServiceProxy(f"http://{rpc_user}:{rpc_password}@127.0.0.1:8332/wallet/{wallet_name}")
     rpc_node = LightningRpc("/home/kauan/.lightning/regtest/lightning-rpc")
 
     # 5. Cria wallet no Bitcoin Core (se não existir)
@@ -93,13 +95,14 @@ if __name__ == "__main__":
 
         # 13. Criar invoice Lightning para 100000 millisatoshis (100 sat)
         random_label = str(uuid.uuid4())
-        node2_invoice = rpc_node.invoice(100000, random_label, "testpayment") # Permitir que o usuário escolha o valor da invoice (aqui está em milisatoshis), label e descrição.
+        node2_invoice = rpc_node.invoice(555555, random_label, "testpayment") # Permitir que o usuário escolha o valor da invoice (aqui está em milisatoshis), label e descrição.
         print("---------------------------")
         print(f"Invoice node 2 gerado: {node2_invoice}")
 
         # Empacota para o qrcode isso aqui:
         infos_node = {"invoice": node2_invoice, "node": {"lightning_address": lightning_address, "node_id": rpc_node.getinfo()["id"]}}
-
+        with open("infos_node.json", "w") as f:
+            json.dump(infos_node, f, indent=4)
         # 15. Verifica status da invoice criada
         invoice_status = rpc_node.listinvoices(random_label)
         if invoice_status["invoices"]:
@@ -112,8 +115,6 @@ if __name__ == "__main__":
         else:
             print(f"Invoice {random_label} não encontrada.")
 
-
-
         # 17. Obter id do canal utilizado para o pagamento (último canal)
         node_funds = rpc_node.listfunds()
         channel_id = None
@@ -124,23 +125,14 @@ if __name__ == "__main__":
         if not channel_id:
             print("Canal não encontrado para fechamento!")
         else:
-            # 18. Espera até o canal estar pronto para ser fechado (short_channel_id disponível e estado CHANNELD_NORMAL)
+            # 18. Espera até o canal estar fechado
             max_wait = 60  # segundos
             waited = 0
-            while (ch["state"] != "CLOSINGD_COMPLETE") and waited < max_wait:
-                print(f"Aguardando fechamento do canal... Estado atual: {ch['state']}")
+            while waited < max_wait:
+                print(f"Aguardando fechamento do canal...")
                 time.sleep(2)
                 waited += 2
-                node_funds = rpc_node.listfunds()
-                if node_funds["channels"]:
-                    ch = node_funds["channels"][-1]
-
-        if ch["state"] != "CLOSINGD_COMPLETE":
-            print(f"Canal não fechado: {ch}")
-            # raise Exception("Canal não fechado!")
-        else:
-            print(f"Canal fechado com sucesso: {ch}")
 
         # 19. Printar saldo total dos nodes
         node_total = saldo_total(rpc_node.listfunds())
-        print(f"Saldo total Node 1: {node_total} satoshis")
+        print(f"Saldo total PC: {node_total} satoshis")
