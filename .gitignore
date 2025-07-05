@@ -1,4 +1,65 @@
-.venv/
+# Arquivos de ambiente com informações sensíveis
+.env
+.env.local
+.env.production
+.env.development
+
+# Arquivos de configuração do Bitcoin e Lightning
+~/.bitcoin/
+~/.lightning/
+~/.lightning2/
+~/.prometheu/
+
+# Arquivos de log
 *.log
+lightningd.log
+lightningd2.log
+
+# Arquivos temporários
+*.tmp
+*.temp
+infos_node.json
+
+# Arquivos Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Ambientes virtuais
+venv/
+env/
+ENV/
+lightning_env/
+.venv/
+.lightning_env/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Sistema
+.DS_Store
+Thumbs.db
+
 README.md
 *.json

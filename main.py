@@ -1,10 +1,15 @@
 import json
+import os
+from dotenv import load_dotenv
 from bip_utils import Bip39MnemonicGenerator, Bip39SeedGenerator, Bip44, Bip44Coins, WifEncoder, CoinsConf, WifPubKeyModes
 from pyln.client import LightningRpc
 from bitcoinrpc.authproxy import AuthServiceProxy
 from bip_utils import Bip44Changes
 import uuid
 import time
+
+# Carrega as variáveis de ambiente
+load_dotenv()
 
 def generate_mnemonics():
     return Bip39MnemonicGenerator().FromWordsNumber(24)
@@ -26,7 +31,7 @@ def saldo_total(node_funds):
 if __name__ == "__main__":
     print("---------------------------")
     # 1. Gera mnemonics
-    mnemonics = generate_mnemonics() # Adicionar a lógica para interação com o usuário caso seja requerido por ele.
+    mnemonics = generate_mnemonics()
     print("MNEMONICS GERADOS:")
     print(mnemonics)
     print("---------------------------")
@@ -44,11 +49,13 @@ if __name__ == "__main__":
     print("WIF gerado:", wif_key)
 
     # 4. Conexão RPC Bitcoin Core e Lightning
-    rpc_user = "prometheu@prometheu"
-    rpc_password = "prometheu"
-    wallet_name = "regtest_wallet"
-    rpc_connection = AuthServiceProxy(f"http://{rpc_user}:{rpc_password}@127.0.0.1:8332/wallet/{wallet_name}")
-    rpc_node = LightningRpc("/home/kauan/.lightning/regtest/lightning-rpc")
+    rpc_user = os.getenv("BITCOIN_RPC_USER")
+    rpc_password = os.getenv("BITCOIN_RPC_PASSWORD")
+    rpc_host = os.getenv("BITCOIN_RPC_HOST")
+    rpc_port = os.getenv("BITCOIN_RPC_PORT")
+    wallet_name = os.getenv("BITCOIN_WALLET_NAME")
+    rpc_connection = AuthServiceProxy(f"http://{rpc_user}:{rpc_password}@{rpc_host}:{rpc_port}/wallet/{wallet_name}")
+    rpc_node = LightningRpc(os.getenv("LIGHTNING_RPC_PATH"))
 
     # 5. Cria wallet no Bitcoin Core (se não existir)
     try:
@@ -72,10 +79,10 @@ if __name__ == "__main__":
         print("---------------------------")
         print(f"Endereço on-chain da Lightning wallet: {lightning_address}")
         node_funds_temp = rpc_node.listfunds()
-        print(f"Saldo total Node 1: {saldo_total(node_funds_temp)} satoshis") # Se quiserem colocar em reais, façam a conversão.
+        print(f"Saldo total Node 1: {saldo_total(node_funds_temp)} satoshis")
 
         # 8. Envia 1 BTC da wallet para a carteira Lightning
-        txid = rpc_connection.sendtoaddress(lightning_address, 1) # Colocar aqui o valor que deseja enviar para a Lightning wallet, escolha do usuário (Valor em BTC).
+        txid = rpc_connection.sendtoaddress(lightning_address, 1)
         print("---------------------------")
         print(f"Transação enviada para Lightning. TXID: {txid}")
 
@@ -93,17 +100,18 @@ if __name__ == "__main__":
         print(f"Saldo total Node 1: {saldo_total(node_funds_temp)} satoshis")
 
 
-        # 13. Criar invoice Lightning para 100000 millisatoshis (100 sat)
+        # 11. Cria invoice Lightning para 100000 millisatoshis (100 sat)
         random_label = str(uuid.uuid4())
-        node2_invoice = rpc_node.invoice(555555, random_label, "testpayment") # Permitir que o usuário escolha o valor da invoice (aqui está em milisatoshis), label e descrição.
+        node2_invoice = rpc_node.invoice(100000, random_label, "testpayment") # Permitir que o usuário escolha o valor da invoice (aqui está em milisatoshis), label e descrição.
         print("---------------------------")
         print(f"Invoice node 2 gerado: {node2_invoice}")
 
-        # Empacota para o qrcode isso aqui:
+        # 12. Informações para geração do QRCode:
         infos_node = {"invoice": node2_invoice, "node": {"lightning_address": lightning_address, "node_id": rpc_node.getinfo()["id"]}}
         with open("infos_node.json", "w") as f:
             json.dump(infos_node, f, indent=4)
-        # 15. Verifica status da invoice criada
+
+        # 13. Verifica status da invoice criada
         invoice_status = rpc_node.listinvoices(random_label)
         if invoice_status["invoices"]:
             print(f"Status da invoice {random_label}: {invoice_status['invoices'][-1]['status']}")
@@ -115,7 +123,7 @@ if __name__ == "__main__":
         else:
             print(f"Invoice {random_label} não encontrada.")
 
-        # 17. Obter id do canal utilizado para o pagamento (último canal)
+        # 14. Obter id do canal utilizado para o pagamento (último canal)
         node_funds = rpc_node.listfunds()
         channel_id = None
         if node_funds["channels"]:
@@ -125,7 +133,7 @@ if __name__ == "__main__":
         if not channel_id:
             print("Canal não encontrado para fechamento!")
         else:
-            # 18. Espera até o canal estar fechado
+            # 15. Espera até o canal estar fechado
             max_wait = 60  # segundos
             waited = 0
             while waited < max_wait:
@@ -133,6 +141,6 @@ if __name__ == "__main__":
                 time.sleep(2)
                 waited += 2
 
-        # 19. Printar saldo total dos nodes
+        # 16. Printar saldo total dos nodes
         node_total = saldo_total(rpc_node.listfunds())
         print(f"Saldo total PC: {node_total} satoshis")
