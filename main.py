@@ -1,8 +1,14 @@
+import os
+from dotenv import load_dotenv
 from bip_utils import Bip39MnemonicGenerator, Bip39SeedGenerator, Bip44, Bip44Coins, WifEncoder, CoinsConf, WifPubKeyModes
 from pyln.client import LightningRpc
 from bitcoinrpc.authproxy import AuthServiceProxy
 from bip_utils import Bip44Changes
 import time
+import json
+
+# Carrega as variáveis de ambiente
+load_dotenv()
 
 def generate_mnemonics():
     return Bip39MnemonicGenerator().FromWordsNumber(24)
@@ -17,28 +23,27 @@ def generate_wallet(seed_bytes):
     bip44_addr_ctx = bip44_change_ctx.AddressIndex(0)
     return bip44_addr_ctx.PrivateKey().Raw().ToBytes()
 
-# Soma o saldo total dos outputs de um node
 def saldo_total(node_funds):
-    return sum([out['amount_msat'] for out in node_funds['outputs']]) / 1000  # em satoshis
+    return sum([out["amount_msat"] for out in node_funds["outputs"]]) / 1000  # em satoshis
 
 if __name__ == "__main__":
     # --- CONFIGURAÇÕES DE AMBIENTE ---
-    NODE1_RPC_PATH = "/home/prometheu/.lightning/regtest/lightning-rpc" # Verificar se está nesse caminho mesmo.
+    NODE1_RPC_PATH = os.getenv("LIGHTNING_RPC_PATH_PI")
 
-    # Dados do node remoto (Node 2)
-    NODE2_IP = '192.168.15.6'          # Verificar sempre que trocar de rede
-    NODE2_PORT = 9735                  # Porta padrão
+    # Dados do Prometheu PC (Node 2)
+    NODE2_IP = os.getenv("NODE2_IP")
+    NODE2_PORT = int(os.getenv("NODE2_PORT"))
 
-    # Dados de conexão do Bitcoin Core
-    rpc_user = 'prometheu@prometheu'
-    rpc_password = 'prometheu'
-    rpc_host = '192.168.15.6'
-    rpc_port = 8332
+    # Dados de conexão do Bitcoin Core (Prometheu PC)
+    rpc_user = os.getenv("BITCOIN_RPC_USER")
+    rpc_password = os.getenv("BITCOIN_RPC_PASSWORD")
+    rpc_host = os.getenv("NODE2_IP")
+    rpc_port = int(os.getenv("BITCOIN_RPC_PORT"))
+    wallet_name = "prometheu_wallet"
 
     # --- INICIALIZAÇÃO DAS CONEXÕES ---
-    rpc_connection = AuthServiceProxy(f"http://{rpc_user}:{rpc_password}@{rpc_host}:{rpc_port}")
+    rpc_connection = AuthServiceProxy(f"http://{rpc_user}:{rpc_password}@{rpc_host}:{rpc_port}/wallet/{wallet_name}")
     rpc_node1 = LightningRpc(NODE1_RPC_PATH)
-
 
     print("---------------------------")
     # 1. Gera mnemonics
@@ -78,17 +83,19 @@ if __name__ == "__main__":
         print(f"Saldo da wallet on-chain após importação da chave privada: {rpc_connection.getbalance()}")
 
         # 6. Pega endereço Lightning on-chain
-        with open('lightning_address', 'r') as f:
+        prometheu_dir_pi = os.getenv("PROMETHEU_DIR_PI")
+        with open(f'{prometheu_dir_pi}/lightning_address', 'r') as f:
             lightning_address = f.read().strip()
             if not lightning_address:
-                lightning_address = rpc_node1.newaddr()['bech32']
-                with open('lightning_address.txt', 'w') as f:
+                lightning_address = rpc_node1.newaddr()["bech32"]
+                with open(f'{prometheu_dir_pi}/lightning_address', 'w') as f:
                     f.write(lightning_address)
 
         print("---------------------------")
         print(f"Endereço on-chain da Lightning wallet: {lightning_address}")
         node1_funds_temp = rpc_node1.listfunds()
         print(f"Saldo total Node 1: {saldo_total(node1_funds_temp)} satoshis")
+        rpc_connection.generatetoaddress(10, rpc_connection.getnewaddress())
 
         # 7. Envia 1 BTC da wallet para a carteira Lightning
         txid = rpc_connection.sendtoaddress(lightning_address, 1) # Colocar aqui o valor que deseja enviar para a Lightning wallet, escolha do usuário (Valor em BTC).
@@ -111,55 +118,58 @@ if __name__ == "__main__":
         print("---------------------------")
         print(f"Informações do node 1: {rpc_node1.getinfo()}")
 
-        # 10. Criar invoice Lightning para 100000 millisatoshis (100 sat)
-        infos_node2 = "" # Desempacotar o valor do qrcode gerado no node 2, saída esperada: {"invoice": {"bolt11": "...", "destination": "..."}, "node": {"lightning_address": "bcrt1...", "node_id": "..."}}
+        # 10. Desempacota as informações do Prometheu PC (Node 2)
+        with open("infos_node.json") as f:
+            infos_node2 = json.load(f)
+
+        #infos_node2 =  # Desempacotar o valor do qrcode gerado no node 2, saída esperada: {"invoice": {"bolt11": "...", "destination": "..."}, "node": {"lightning_address": "bcrt1...", "node_id": "..."}}
         bolt11_invoice = infos_node2["invoice"]["bolt11"]
         node2_address = infos_node2["node"]["lightning_address"]
         node2_id = infos_node2["node"]["node_id"]
         print("---------------------------")
-        print(f"Invoice node 2 (BOLT11) recebida: {bolt11_invoice}")
+        print(f"Invoice node PC (BOLT11) recebida: {bolt11_invoice}")
 
-        # 11. Conecta-se ao Node 2 e abre canal de pagamento
+        # 11. Conecta-se ao Prometheu PC (Node 2) e abre canal de pagamento
         # Use as variáveis de configuração para conectar
         rpc_node1.connect(node2_id, NODE2_IP, NODE2_PORT)
-        funding_address = rpc_node1.fundchannel(node2_id, '100000sat')  # 100.000 msat = 0.001 BTC
+        funding_address = rpc_node1.fundchannel(node2_id, '1000000sat')  # 100.000 msat = 0.001 BTC
         print("---------------------------")
         print(f"Canal aberto: {funding_address}")
 
-        # 11. Confirma o canal minerando 6 blocos
+        # 12. Confirma o canal minerando 6 blocos
         rpc_connection.generatetoaddress(6, rpc_connection.getnewaddress())
 
-        # 13. Realiza pagamento via pay
+        # 13. Realiza pagamento via pay (aqui é o pagamento feito pelo PI para o Prometheu PC (Node 2))
         pay_result = rpc_node1.pay(bolt11_invoice)
         print("---------------------------")
         print(f"Pagamento enviado: {pay_result}")
 
-        # 16. Obter id do canal utilizado para o pagamento (último canal)
+        # 14. Obter id do canal utilizado para o pagamento (último canal)
         node1_funds = rpc_node1.listfunds()
         channel_id = None
-        if node1_funds['channels']:
-            ch = node1_funds['channels'][-1]
-            channel_id = ch['channel_id'] if 'channel_id' in ch else ch.get('short_channel_id')
+        if node1_funds["channels"]:
+            ch = node1_funds["channels"][-1]
+            channel_id = ch["channel_id"] if "channel_id" in ch else ch.get("short_channel_id")
             print(f"Canal utilizado: {ch}")
         if not channel_id:
             print("Canal não encontrado para fechamento!")
         else:
-            # 17. Espera até o canal estar pronto para ser fechado (short_channel_id disponível e estado CHANNELD_NORMAL)
+            # 15. Espera até o canal estar pronto para ser fechado (short_channel_id disponível e estado CHANNELD_NORMAL)
             max_wait = 60  # segundos
             waited = 0
-            while ('short_channel_id' not in ch or ch['state'] != 'CHANNELD_NORMAL') and waited < max_wait:
+            while ("short_channel_id" not in ch or ch["state"] != "CHANNELD_NORMAL") and waited < max_wait:
                 print(f"Aguardando canal lockin... Estado atual: {ch['state']}")
                 time.sleep(2)
                 waited += 2
                 node1_funds = rpc_node1.listfunds()
-                if node1_funds['channels']:
-                    ch = node1_funds['channels'][-1]
-            if 'short_channel_id' not in ch or ch['state'] != 'CHANNELD_NORMAL':
-                raise Exception('Canal não ficou pronto para fechamento (lockin) após tempo limite!')
-            short_channel_id = ch['short_channel_id']
+                if node1_funds["channels"]:
+                    ch = node1_funds["channels"][-1]
+            if "short_channel_id" not in ch or ch["state"] != "CHANNELD_NORMAL":
+                raise Exception("Canal não ficou pronto para fechamento (lockin) após tempo limite!")
+            short_channel_id = ch["short_channel_id"]
             close_result = rpc_node1.close(short_channel_id, 0, destination=node2_address)
             print(f"Resultado do fechamento do canal (com short_channel_id): {close_result}")
 
-        # 18. Printar saldo total do node
+        # 16. Printar saldo total do node (Prometheu PI)
         node1_total = saldo_total(rpc_node1.listfunds())
-        print(f"Saldo total Node 1: {node1_total} satoshis")
+        print(f"Saldo total Node PI: {node1_total} satoshis")
