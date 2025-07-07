@@ -140,6 +140,14 @@ def convert_ascii(tecla):
 serial = spi(port=0, device=0, gpio_DC=24, gpio_RST=25)
 device = ili9341(serial, width=240, height=240, rotate=1)
 
+def cadastrar_senha(palavra):
+    with Image.new("RGB", device.size, "black") as img:
+        draw = ImageDraw.Draw(img)
+        draw.rectangle((10, 80, 220, 130), outline="white", width=2)
+        draw.text((15, 85), f"Cadastrar senha:{(palavra)}", fill="white")
+        device.display(img.rotate(270))
+
+
 def cadastrar_palavras(palavra): 
     with Image.new("RGB", device.size, "black") as img: 
         draw = ImageDraw.Draw(img)
@@ -172,16 +180,25 @@ def desenhar_tela_login(login, senha, fase):
 
         device.display(img.rotate(270))
 
-def desenhar_logado():
+def desenhar_logado(saldo):
     with Image.new("RGB", device.size, "black") as img:
         draw = ImageDraw.Draw(img)
         draw.rectangle((40, 100, 200, 140), fill="black")
         draw.text((60, 80), "Aperte * para gerar qr code", fill="white")
         draw.rectangle([(55,75), (185, 95 )], outline = "white")  
-        draw.rectangle([(55,115), (185, 135 )], outline = "white") 
-        draw.text((60, 120), "Aperte # para ler qr code", fill="white")
+        draw.text((60, 100), "Saldo:{(saldo)}", fill="white")
         device.display(img.rotate(270))
 
+
+def desenhar_novo_cadastro():
+    with Image.new("RGB", device.size, "black") as img:
+        draw = ImageDraw.Draw(img)
+        draw.rectangle((40, 100, 200, 140), fill="black")
+        draw.text((60, 80), "Aperte * para criar carteira", fill="white")
+        draw.rectangle([(55,75), (185, 95 )], outline = "white")  
+        draw.rectangle([(55,115), (185, 135 )], outline = "white") 
+        draw.text((60, 120), "Aperte # logar", fill="white") 
+        device.display(img.rotate(270))
 
 def desenhar_ler():
     with Image.new("RGB", device.size, "black") as img:
@@ -226,323 +243,385 @@ if __name__ == "__main__":
     palavra = ""
     vetor_palavras = []
     flag_regpalavra = 0
-    estado = -1
+    estado = -10
     actual = 0
     login = ""
     senha = ""
     fase = "senha"
     tela_boot()
-    # --- Verificar se já tem 12 palavras salvas ---
-    if os.path.exists("mnemonics.txt"):
-        with open("mnemonics.txt", "r") as f:
-            linhas = f.readlines()
-            for linha in linhas:
-                palavra_lida = linha.strip().lower()
-                if palavra_valida_bip39(palavra_lida):
-                    vetor_palavras.append(palavra_lida)
-
-    if len(vetor_palavras) >= NUM_PALAVRAS_OBJETIVO:
-        print("✅ 24 palavras BIP-39 já estavam salvas:")
-        print(" ".join(vetor_palavras[:NUM_PALAVRAS_OBJETIVO]))
-        estado = 0  # Pula direto para gerar chave
-    else:
-        print(f"🔧 {len(vetor_palavras)} palavras válidas encontradas. Digite mais até {NUM_PALAVRAS_OBJETIVO}.")
-
     try:
-        while estado == -1:
-            cadastrar_palavras(palavra)
-            if hashtag == 0:
+        while True: 
+            while estado == -10:
+                desenhar_novo_cadastro()
                 tecla = ler_tecla()
-            else:
-                tecla = str(input())
+                if tecla:
+                    if tecla == "*":
+                        estado = -1
+                        print("novo cadastro")
+                        open("mnemonics.txt", "w").close()
 
-            if tecla:
-                if flag_regpalavra == 1 or tecla == ';':
-                    palavra = palavra.strip().lower()
-                    if palavra_valida_bip39(palavra):
-                        vetor_palavras.append(palavra)
-                        print("✅ Palavra registrada:", palavra)
-                        with open("mnemonics.txt", "a") as f:
-                            f.write(palavra + "\n")
-                    else:
-                        print("❌ Palavra inválida BIP-39:", palavra)
-                    palavra = ""
-                    flag_regpalavra = 0
-
-                elif tecla == "*":
-                    if len(vetor_palavras) >= NUM_PALAVRAS_OBJETIVO:
+                        break
+                    elif tecla == "#":
                         estado = 0
                         break
-                    else:
-                        print(f"⛔ Faltam {NUM_PALAVRAS_OBJETIVO - len(vetor_palavras)} palavras BIP-39 válidas")
+                desenhar_novo_cadastro()
 
-                elif tecla == "#":
-                    hashtag = 1
-                    print("Teclado ativado")
+            # --- Verificar se já tem 12 palavras salvas ---
+            if os.path.exists("mnemonics.txt"):
+                with open("mnemonics.txt", "r") as f:
+                    linhas = f.readlines()
+                    for linha in linhas:
+                        palavra_lida = linha.strip().lower()
+                        if palavra_valida_bip39(palavra_lida):
+                            vetor_palavras.append(palavra_lida)
 
-                elif tecla == "^":
-                    mnemonico = Bip39MnemonicGenerator().FromWordsNumber(NUM_PALAVRAS_OBJETIVO)
-                    print("Mnemônico gerado automaticamente:\n", mnemonico)
-                    vetor_palavras = str(mnemonico).split()
-                    salvar_palavras_arquivo(vetor_palavras)
-                    estado = 0  # Já tem palavras suficientes, pula para geração
-                    break
-
-                elif hashtag == 0:
-                    # Aqui tecla pode ser string ou número dependendo do ler_tecla, adapte se necessário
-                    # Se for int, converte para char
-                    if isinstance(tecla, int):
-                        palavra += chr(tecla)
-                    else:
-                        palavra += tecla
-
-                elif hashtag == 1:
-                    palavra += tecla
-
-        # Usar apenas as primeiras 24 palavras válidas
-        vetor_palavras = vetor_palavras[:NUM_PALAVRAS_OBJETIVO]
-
-        # Mostrar mnemonic
-        mnemonics = ' '.join(vetor_palavras)
-        print("\n🧠 Mnemonic final:")
-        print(mnemonics)
-
-        # Validar mnemonic
-        try:
-            Bip39MnemonicValidator().Validate(mnemonics)
-        except Exception as e:
-            print("❌ Mnemonic final inválido:", e)
-            exit(1)
-
-        # Gerar seed e chaves
-        seed = generate_seed(mnemonics)
-        print("🧬 Seed (hex):", seed.hex())
-
-        priv_key = generate_wallet(seed)
-        print("🔑 Private key (hex):", priv_key.hex())
-
-        net_ver = CoinsConf.BitcoinTestNet.ParamByKey("wif_net_ver")
-        wif_key = WifEncoder.Encode(priv_key, net_ver, WifPubKeyModes.COMPRESSED)
-        print("🔐 WIF key:", wif_key)
-
-        time.sleep(5)
-
-
-        desenhar_tela_login(login, senha, fase)
-        while estado == 0:
-            if hashtag == 0:
-                tecla = ler_tecla()
+            if len(vetor_palavras) >= NUM_PALAVRAS_OBJETIVO:
+                print("✅ 24 palavras BIP-39 já estavam salvas:")
+                print(" ".join(vetor_palavras[:NUM_PALAVRAS_OBJETIVO]))
+                estado = 0  # Pula direto para gerar chave
             else:
-                tecla = str(input())
+                print(f"🔧 {len(vetor_palavras)} palavras válidas encontradas. Digite mais até {NUM_PALAVRAS_OBJETIVO}.")
 
-            if tecla:
-                if tecla == "*":
-                    if fase == "senha" and senha == "1234":
-                        estado = 1
-                        break
-                    elif fase == "senha" and senha != "1234":
-                        senha = ""
-                        fase = "senha"
-                elif tecla == "#":
-                    hashtag = 1
-                    print("Teclado ativado")
+            try:
+                while estado == -1:
+                    cadastrar_palavras(palavra)
+                    if hashtag == 0:
+                        tecla = ler_tecla()
+                    else:
+                        tecla = str(input())
 
-                elif hashtag == 0:
-                    if fase == "senha":
-                        senha += chr(tecla)
-                    actual = int(0)
+                    if tecla:
+                        if flag_regpalavra == 1 or tecla == ';':
+                            palavra = palavra.strip().lower()
+                            if palavra_valida_bip39(palavra):
+                                vetor_palavras.append(palavra)
+                                print("✅ Palavra registrada:", palavra)
+                                with open("mnemonics.txt", "a") as f:
+                                    f.write(palavra + "\n")
+                            else:
+                                print("❌ Palavra inválida BIP-39:", palavra)
+                            palavra = ""
+                            flag_regpalavra = 0
 
-                elif hashtag == 1:
-                    if fase == "senha":
-                        senha += tecla
+                        elif tecla == "*":
+                            if len(vetor_palavras) >= NUM_PALAVRAS_OBJETIVO:
+                                estado = -5
+                                break
+                            else:
+                                print(f"⛔ Faltam {NUM_PALAVRAS_OBJETIVO - len(vetor_palavras)} palavras BIP-39 válidas")
+
+                        elif tecla == "#":
+                            hashtag = 1
+                            print("Teclado ativado")
+
+                        elif tecla == "^":
+                            mnemonico = Bip39MnemonicGenerator().FromWordsNumber(NUM_PALAVRAS_OBJETIVO)
+                            print("Mnemônico gerado automaticamente:\n", mnemonico)
+                            vetor_palavras = str(mnemonico).split()
+                            salvar_palavras_arquivo(vetor_palavras)
+                            estado = -5  # Já tem palavras suficientes, pula para geração
+                            break
+
+                        elif hashtag == 0:
+                            # Aqui tecla pode ser string ou número dependendo do ler_tecla, adapte se necessário
+                            # Se for int, converte para char
+                            if isinstance(tecla, int):
+                                palavra += chr(tecla)
+                            else:
+                                palavra += tecla
+
+                        elif hashtag == 1:
+                            palavra += tecla
+
+                # Usar apenas as primeiras 24 palavras válidas
+                vetor_palavras = vetor_palavras[:NUM_PALAVRAS_OBJETIVO]
+
+                # Mostrar mnemonic
+                mnemonics = ' '.join(vetor_palavras)
+                print("\n🧠 Mnemonic final:")
+                print(mnemonics)
+
+                # Validar mnemonic
+                try:
+                    Bip39MnemonicValidator().Validate(mnemonics)
+                except Exception as e:
+                    print("❌ Mnemonic final inválido:", e)
+                    exit(1)
+
+                # Gerar seed e chaves
+                seed = generate_seed(mnemonics)
+                print("🧬 Seed (hex):", seed.hex())
+
+                priv_key = generate_wallet(seed)
+                print("🔑 Private key (hex):", priv_key.hex())
+
+                net_ver = CoinsConf.BitcoinTestNet.ParamByKey("wif_net_ver")
+                wif_key = WifEncoder.Encode(priv_key, net_ver, WifPubKeyModes.COMPRESSED)
+                print("🔐 WIF key:", wif_key)
+
+                time.sleep(5)
+
+                palvra = ""
+                while estado == -5:
+                    cadastrar_senha(palavra)
+                    if hashtag == 0:
+                        tecla = ler_tecla()
+                    else:
+                        tecla = str(input())
+
+                    if tecla:
+                        
+                        print(palavra) 
+                        if tecla == "*":
+                            if len(palavra) == 4:    
+                                estado = 0
+                                with open("senha.txt", "w") as f:
+                                    f.write(palavra)
+                                    print("✅ Senha cadastrada com sucesso.") 
+                                break
+                            else:
+                                palavra = ""
+                        elif tecla == "#":
+                            hashtag = 1
+                            print("Teclado ativado")
+
+                        
+                        elif hashtag == 0:
+                            palavra += chr(tecla)
+                            actual = int(0)
+
+                        elif hashtag == 1:
+                            palavra += tecla
+
+
+                try:
+                    with open("senha.txt", "r") as f:
+                        senha_salva = f.read().strip()
+                except FileNotFoundError:
+                    print("❌ Arquivo de senha não encontrado.")
+                    senha_salva = ""
+
 
                 desenhar_tela_login(login, senha, fase)
+                while estado == 0:
+                    if hashtag == 0:
+                        tecla = ler_tecla()
+                    else:
+                        tecla = str(input())
+
+                    if tecla:
+                        if tecla == "*":
+                            if fase == "senha" and senha == senha_salva:
+                                estado = 1
+                                break
+                            elif fase == "senha" and senha != senha_salva:
+                                senha = ""
+                                fase = "senha"
+                        elif tecla == "#":
+                            hashtag = 1
+                            print("Teclado ativado")
+
+                        elif hashtag == 0:
+                            if fase == "senha":
+                                senha += chr(tecla)
+                            actual = int(0)
+
+                        elif hashtag == 1:
+                            if fase == "senha":
+                                senha += tecla
+
+                        desenhar_tela_login(login, senha, fase)
 
 
-        # --- CONFIGURAÇÕES DE AMBIENTE ---
-        NODE1_RPC_PATH = os.getenv("LIGHTNING_RPC_PATH_PI")
+                # --- CONFIGURAÇÕES DE AMBIENTE ---
+                NODE1_RPC_PATH = os.getenv("LIGHTNING_RPC_PATH_PI")
 
-        # Dados do Prometheu PC (Node 2)
-        NODE2_IP = os.getenv("NODE2_IP")
-        NODE2_PORT = int(os.getenv("NODE2_PORT"))
+                # Dados do Prometheu PC (Node 2)
+                NODE2_IP = os.getenv("NODE2_IP")
+                NODE2_PORT = int(os.getenv("NODE2_PORT"))
 
-        # Dados de conexão do Bitcoin Core (Prometheu PC)
-        rpc_user = os.getenv("BITCOIN_RPC_USER")
-        rpc_password = os.getenv("BITCOIN_RPC_PASSWORD")
-        rpc_host = os.getenv("NODE2_IP")
-        rpc_port = int(os.getenv("BITCOIN_RPC_PORT"))
-        wallet_name = "prometheu_wallet"
+                # Dados de conexão do Bitcoin Core (Prometheu PC)
+                rpc_user = os.getenv("BITCOIN_RPC_USER")
+                rpc_password = os.getenv("BITCOIN_RPC_PASSWORD")
+                rpc_host = os.getenv("NODE2_IP")
+                rpc_port = int(os.getenv("BITCOIN_RPC_PORT"))
+                wallet_name = "prometheu_wallet"
 
-        # --- INICIALIZAÇÃO DAS CONEXÕES ---
-        rpc_connection = AuthServiceProxy(f"http://{rpc_user}:{rpc_password}@{rpc_host}:{rpc_port}/wallet/{wallet_name}")
-        rpc_node1 = LightningRpc(NODE1_RPC_PATH)
-        
-        # 4. Cria wallet no Bitcoin Core (se não existir)
-        try:
-            rpc_connection.createwallet("prometheu_wallet", False, False, "", False, False, True)
-            rpc_connection.generatetoaddress(3, rpc_connection.getnewaddress())
-        except Exception as e:
-            print(f"Wallet já existe ou erro ao criar: {e}")
+                # --- INICIALIZAÇÃO DAS CONEXÕES ---
+                rpc_connection = AuthServiceProxy(f"http://{rpc_user}:{rpc_password}@{rpc_host}:{rpc_port}/wallet/{wallet_name}")
+                rpc_node1 = LightningRpc(NODE1_RPC_PATH)
+                
+                # 4. Cria wallet no Bitcoin Core (se não existir)
+                try:
+                    rpc_connection.createwallet("prometheu_wallet", False, False, "", False, False, True)
+                    rpc_connection.generatetoaddress(3, rpc_connection.getnewaddress())
+                except Exception as e:
+                    print(f"Wallet já existe ou erro ao criar: {e}")
 
-        # 5. Checa se a wallet existe ou já está carregada e importa chave privada
-        try:
-            rpc_connection.loadwallet("prometheu_wallet")
-        except Exception as e:
-            print(f"Erro ao carregar wallet: {e}")
-        finally:
-            print(f"Saldo da wallet on-chain: {rpc_connection.getbalance()}")
-            rpc_connection.importprivkey(wif_key)
-            print("---------------------------")
-            print(f"Saldo da wallet on-chain após importação da chave privada: {rpc_connection.getbalance()}")
+                # 5. Checa se a wallet existe ou já está carregada e importa chave privada
+                try:
+                    rpc_connection.loadwallet("prometheu_wallet")
+                except Exception as e:
+                    print(f"Erro ao carregar wallet: {e}")
+                finally:
+                    print(f"Saldo da wallet on-chain: {rpc_connection.getbalance()}")
+                    rpc_connection.importprivkey(wif_key)
+                    print("---------------------------")
+                    print(f"Saldo da wallet on-chain após importação da chave privada: {rpc_connection.getbalance()}")
 
-            # 6. Pega endereço Lightning on-chain
-            prometheu_dir_pi = os.getenv("PROMETHEU_DIR_PI")
-            with open(f'{prometheu_dir_pi}/lightning_address.txt', 'r') as f:
-                lightning_address = f.read().strip()
-                if not lightning_address:
-                    lightning_address = rpc_node1.newaddr()["bech32"]
-                    with open(f'{prometheu_dir_pi}/lightning_address.txt', 'w') as f:
-                        f.write(lightning_address)
+                    # 6. Pega endereço Lightning on-chain
+                    prometheu_dir_pi = os.getenv("PROMETHEU_DIR_PI")
+                    with open(f'{prometheu_dir_pi}/lightning_address.txt', 'r') as f:
+                        lightning_address = f.read().strip()
+                        if not lightning_address:
+                            lightning_address = rpc_node1.newaddr()["bech32"]
+                            with open(f'{prometheu_dir_pi}/lightning_address.txt', 'w') as f:
+                                f.write(lightning_address)
 
-            print("---------------------------")
-            print(f"Endereço on-chain da Lightning wallet: {lightning_address}")
-            node1_funds_temp = rpc_node1.listfunds()
-            print(f"Saldo total Node 1: {saldo_total(node1_funds_temp)} satoshis")
-            rpc_connection.generatetoaddress(10, rpc_connection.getnewaddress())
+                    print("---------------------------")
+                    print(f"Endereço on-chain da Lightning wallet: {lightning_address}")
+                    node1_funds_temp = rpc_node1.listfunds()
+                    print(f"Saldo total Node 1: {saldo_total(node1_funds_temp)} satoshis")
+                    rpc_connection.generatetoaddress(10, rpc_connection.getnewaddress())
 
-        palavra = ""
-        selecionar_valor(palavra)
-        while estado == 1:
-            if hashtag == 0:
-                tecla = ler_tecla()
-            else:
-                tecla = str(input())
 
-            if tecla:
-                if tecla == "*" and palavra != "":
-                    estado = 2
-                    break
-                elif tecla == "#":
-                    hashtag = 1
-                    print("Teclado ativado")
-
-                elif hashtag == 0:
-                    palavra += chr(tecla)
-                    actual = int(0)
-
-                elif hashtag == 1:
-                    palavra += tecla
-
+                ## BEM PERIGOSO ISSO QUE ESTOU FAZENDO AQUI
+                palavra = ""
                 selecionar_valor(palavra)
+                while estado == 1:
+                    if hashtag == 0:
+                        tecla = ler_tecla()
+                    else:
+                        tecla = str(input())
 
-        print(palavra)
-        valor_em_btc = reais_para_btc(palavra)
-        print(valor_em_btc)
-        # 7. Envia 1 BTC da wallet para a carteira Lightning
-        txid = rpc_connection.sendtoaddress(lightning_address, float(1)) # Colocar aqui o valor que deseja enviar para a Lightning wallet, escolha do usuário (Valor em BTC).
-        print("---------------------------")
-        print(f"Transação enviada para Lightning. TXID: {txid}")
-       
-        # 8. Minerar blocos para confirmar no regtest (gera 3 blocos)
-        print("---------------------------")
-        print("Minerando blocos para confirmar...")
-        rpc_connection.generatetoaddress(3, rpc_connection.getnewaddress())
-        print("---------------------------")
-        print("Blocos minerados.")
+                    if tecla:
+                        if tecla == "*" and palavra != "":
+                            estado = 2
+                            break
+                        elif tecla == "#":
+                            hashtag = 1
+                            print("Teclado ativado")
 
-        # 9. Verifica saldo após mineração
-        print("---------------------------")
-        print(f"Saldo da wallet on-chain: {rpc_connection.getbalance()}")
-        node1_funds_temp = rpc_node1.listfunds()
-        print(f"Saldo total Node 1: {saldo_total(node1_funds_temp)} satoshis") # Se quiserem colocar em reais, façam a conversão.
-       
-        while estado == 2:
-            desenhar_logado()
-            tecla = ler_tecla()
-            if tecla:
-                if tecla == "*":
-                    estado = 2
-                    break
-                elif tecla == "#":
-                    estado = 4
-                    break
-            desenhar_logado()
+                        elif hashtag == 0:
+                            palavra += chr(tecla)
+                            actual = int(0)
 
-        print(estado)
-        
-        qr_code = ""
-        while estado == 4 and qr_code == "":
-            desenhar_ler()
-            qr_code = camera()
-            
-        
-        infos_node2 = json.loads(qr_code)  # Desempacotar o valor do qrcode gerado no node 2, saída esperada: {"invoice": {"bolt11": "...", "destination": "..."}, "node": {"lightning_address": "bcrt1...", "node_id": "..."}}
-        
-        
-        
-        with open("infos_node.json", "w", encoding="utf-8") as f:
-            json.dump(infos_node2, f, indent=4, ensure_ascii=False)
-            f.write("\n")  # Garante newline no final do arquivo
+                        elif hashtag == 1:
+                            palavra += tecla
 
-        with open("infos_node.json", "r", encoding="utf-8") as f:
-            infos_node2 = json.load(f)
+                        selecionar_valor(palavra)
+
+                print(palavra)
+                valor_em_btc = reais_para_btc(palavra)
+                print(valor_em_btc)
+                # 7. Envia 1 BTC da wallet para a carteira Lightning
+                txid = rpc_connection.sendtoaddress(lightning_address, float(1)) # Colocar aqui o valor que deseja enviar para a Lightning wallet, escolha do usuário (Valor em BTC).
+                print("---------------------------")
+                print(f"Transação enviada para Lightning. TXID: {txid}")
+               
+                # 8. Minerar blocos para confirmar no regtest (gera 3 blocos)
+                print("---------------------------")
+                print("Minerando blocos para confirmar...")
+                rpc_connection.generatetoaddress(3, rpc_connection.getnewaddress())
+                print("---------------------------")
+                print("Blocos minerados.")
+
+                # 9. Verifica saldo após mineração
+                print("---------------------------")
+                print(f"Saldo da wallet on-chain: {rpc_connection.getbalance()}")
+                node1_funds_temp = rpc_node1.listfunds()
+                print(f"Saldo total Node 1: {saldo_total(node1_funds_temp)} satoshis") # Se quiserem colocar em reais, façam a conversão.
+               
+                while estado == 2:
+                    desenhar_logado(rpc_connection.getbalance())
+                    tecla = ler_tecla()
+                    if tecla:
+                        if tecla == "*":
+                            estado = 2
+                            break
+                        elif tecla == "#":
+                            estado = 4
+                            break
+                    desenhar_logado(rpc_connectio.getbalance())
+
+                print(estado)
+                
+                qr_code = ""
+                while estado == 4 and qr_code == "":
+                    desenhar_ler()
+                    qr_code = camera()
+                    
+                
+                infos_node2 = json.loads(qr_code)  # Desempacotar o valor do qrcode gerado no node 2, saída esperada: {"invoice": {"bolt11": "...", "destination": "..."}, "node": {"lightning_address": "bcrt1...", "node_id": "..."}}
+                
+                
+                
+                with open("infos_node.json", "w", encoding="utf-8") as f:
+                    json.dump(infos_node2, f, indent=4, ensure_ascii=False)
+                    f.write("\n")  # Garante newline no final do arquivo
+
+                with open("infos_node.json", "r", encoding="utf-8") as f:
+                    infos_node2 = json.load(f)
 
 
-        bolt11_invoice = infos_node2["invoice"]["bolt11"]
-        node2_address = infos_node2["node"]["lightning_address"]
-        node2_id = infos_node2["node"]["node_id"]
-        print("---------------------------")
-        print(f"Invoice node PC (BOLT11) recebida: {bolt11_invoice}")
-        
-        
-        
-        # 11. Conecta-se ao Prometheu PC (Node 2) e abre canal de pagamento
-        # Use as variáveis de configuração para conectar
-        rpc_node1.connect(node2_id, NODE2_IP, NODE2_PORT)
-        funding_address = rpc_node1.fundchannel(node2_id, '1000000sat')  # 100.000 msat = 0.001 BTC
-        print("---------------------------")
-        print(f"Canal aberto: {funding_address}")
+                bolt11_invoice = infos_node2["invoice"]["bolt11"]
+                node2_address = infos_node2["node"]["lightning_address"]
+                node2_id = infos_node2["node"]["node_id"]
+                print("---------------------------")
+                print(f"Invoice node PC (BOLT11) recebida: {bolt11_invoice}")
+                
+                
+                
+                # 11. Conecta-se ao Prometheu PC (Node 2) e abre canal de pagamento
+                # Use as variáveis de configuração para conectar
+                rpc_node1.connect(node2_id, NODE2_IP, NODE2_PORT)
+                funding_address = rpc_node1.fundchannel(node2_id, '1000000sat')  # 100.000 msat = 0.001 BTC
+                print("---------------------------")
+                print(f"Canal aberto: {funding_address}")
 
-        # 12. Confirma o canal minerando 6 blocos
-        address = "bcrt1qas5pjsm9rkl02r5t9zellxfmt9yrjf4wypswes"
-        rpc_connection.generatetoaddress(6, address)
+                # 12. Confirma o canal minerando 6 blocos
+                address = "bcrt1qas5pjsm9rkl02r5t9zellxfmt9yrjf4wypswes"
+                rpc_connection.generatetoaddress(6, address)
 
-        # 13. Realiza pagamento via pay (aqui é o pagamento feito pelo PI para o Prometheu PC (Node 2))
-        pay_result = rpc_node1.pay(bolt11_invoice)
-        print("---------------------------")
-        print(f"Pagamento enviado: {pay_result}")
+                # 13. Realiza pagamento via pay (aqui é o pagamento feito pelo PI para o Prometheu PC (Node 2))
+                pay_result = rpc_node1.pay(bolt11_invoice)
+                print("---------------------------")
+                print(f"Pagamento enviado: {pay_result}")
 
-        # 14. Obter id do canal utilizado para o pagamento (último canal)
-        node1_funds = rpc_node1.listfunds()
-        channel_id = None
-        if node1_funds["channels"]:
-            ch = node1_funds["channels"][-1]
-            channel_id = ch["channel_id"] if "channel_id" in ch else ch.get("short_channel_id")
-            print(f"Canal utilizado: {ch}")
-        if not channel_id:
-            print("Canal não encontrado para fechamento!")
-        else:
-            # 15. Espera até o canal estar pronto para ser fechado (short_channel_id disponível e estado CHANNELD_NORMAL)
-            max_wait = 60  # segundos
-            waited = 0
-            while ("short_channel_id" not in ch or ch["state"] != "CHANNELD_NORMAL") and waited < max_wait:
-                print(f"Aguardando canal lockin... Estado atual: {ch['state']}")
-                time.sleep(2)
-                waited += 2
+                # 14. Obter id do canal utilizado para o pagamento (último canal)
                 node1_funds = rpc_node1.listfunds()
+                channel_id = None
                 if node1_funds["channels"]:
                     ch = node1_funds["channels"][-1]
-            if "short_channel_id" not in ch or ch["state"] != "CHANNELD_NORMAL":
-                raise Exception("Canal não ficou pronto para fechamento (lockin) após tempo limite!")
-            short_channel_id = ch["short_channel_id"]
-            close_result = rpc_node1.close(short_channel_id, 0, destination=node2_address)
-            print(f"Resultado do fechamento do canal (com short_channel_id): {close_result}")
+                    channel_id = ch["channel_id"] if "channel_id" in ch else ch.get("short_channel_id")
+                    print(f"Canal utilizado: {ch}")
+                if not channel_id:
+                    print("Canal não encontrado para fechamento!")
+                else:
+                    # 15. Espera até o canal estar pronto para ser fechado (short_channel_id disponível e estado CHANNELD_NORMAL)
+                    max_wait = 60  # segundos
+                    waited = 0
+                    while ("short_channel_id" not in ch or ch["state"] != "CHANNELD_NORMAL") and waited < max_wait:
+                        print(f"Aguardando canal lockin... Estado atual: {ch['state']}")
+                        time.sleep(2)
+                        waited += 2
+                        node1_funds = rpc_node1.listfunds()
+                        if node1_funds["channels"]:
+                            ch = node1_funds["channels"][-1]
+                    if "short_channel_id" not in ch or ch["state"] != "CHANNELD_NORMAL":
+                        raise Exception("Canal não ficou pronto para fechamento (lockin) após tempo limite!")
+                    short_channel_id = ch["short_channel_id"]
+                    close_result = rpc_node1.close(short_channel_id, 0, destination=node2_address)
+                    print(f"Resultado do fechamento do canal (com short_channel_id): {close_result}")
 
-        # 16. Printar saldo total do node (Prometheu PI)
-        node1_total = saldo_total(rpc_node1.listfunds())
-        print(f"Saldo total Node PI: {node1_total} satoshis")
-        # Tela final
-        time.sleep(5)
+                # 16. Printar saldo total do node (Prometheu PI)
+                node1_total = saldo_total(rpc_node1.listfunds())
+                print(f"Saldo total Node PI: {node1_total} satoshis")
+                # Tela final
+                time.sleep(5)
 
-    finally:
-        GPIO.cleanup()
+            finally:
+                GPIO.cleanup()
+
+    except KeyboardInterrupt:
+        print("🛑 Finalizado pelo usuário.")
